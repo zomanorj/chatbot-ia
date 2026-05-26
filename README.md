@@ -1,72 +1,75 @@
-# AI Chat — Chatbot Full-Stack
+# AI Chat — Full-Stack Conversational Interface
 
-Chatbot conversationnel full-stack avec streaming en temps réel, multi-conversations persistantes et interface moderne style ChatGPT.
+A full-stack conversational AI application with real-time token streaming, persistent multi-conversation management, and Markdown rendering.
 
-![Aperçu de l'interface](https://placehold.co/800x400/0f172a/818cf8?text=AI+Chat+—+LLaMA+3.3+via+Groq)
+## Features
 
-## Fonctionnalités
+- **Real-time streaming** via Server-Sent Events (SSE) — token-by-token response delivery
+- **Multi-conversation management** — sidebar with persistent history stored in localStorage
+- **Automatic conversation titles** generated from the first user message
+- **Abort support** — cancel an ongoing generation via AbortController
+- **Message copying** — one-click copy with visual feedback
+- **Timestamps** on each message with full date tooltip
+- **Model selection** — LLaMA 3.3 70B, LLaMA 3.1 8B, Mixtral 8x7B, Gemma 2 9B
+- **Markdown rendering** — formatted code blocks, lists, tables
+- **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for line break
+- **Glassmorphism UI** with dark mode and smooth animations
 
-- **Streaming en temps réel** (Server-Sent Events) — réponse mot par mot comme ChatGPT
-- **Multi-conversations** — sidebar avec historique persistant (localStorage)
-- **Titre auto-généré** pour chaque conversation depuis le premier message
-- **Bouton Stop** — annule la génération en cours (AbortController)
-- **Copier les messages** — icône au survol avec feedback visuel
-- **Timestamps** sur chaque message avec tooltip date complète
-- **Sélection du modèle** — LLaMA 3.3 70B, LLaMA 3.1 8B, Mixtral 8x7B, Gemma 2 9B
-- **Support Markdown** — code formaté, listes, tableaux
-- **Raccourcis clavier** — `Entrée` pour envoyer, `Shift+Entrée` pour saut de ligne
-- **Design Glassmorphism** avec animations et mode sombre
+## Tech Stack
 
-## Stack technique
-
-| Couche | Technologies |
-|--------|-------------|
+| Layer | Technologies |
+|-------|-------------|
 | Frontend | React 18, Vite, Tailwind CSS, Framer Motion, Lucide React |
 | Backend | Node.js, Express, Helmet, express-rate-limit |
-| IA | LLaMA 3.3 70B via [API Groq](https://console.groq.com) (gratuit) |
-| Streaming | Server-Sent Events (SSE) |
+| AI Provider | LLaMA 3.3 70B via [Groq API](https://console.groq.com) |
+| Transport | Server-Sent Events (SSE) |
 
-## Architecture
+## Project Structure
 
 ```
 chatbot-ia/
 ├── backend/
 │   ├── src/
-│   │   ├── index.js          # Express + CORS + Helmet + Rate limiting
-│   │   ├── routes/chat.js    # Route SSE + validation + sélection modèle
+│   │   ├── index.js                   # Express server, CORS, Helmet, rate limiting
+│   │   ├── routes/chat.js             # SSE endpoint, input validation, model selection
 │   │   └── middleware/errorHandler.js
-│   ├── .env.example          # Template variables d'environnement
+│   ├── .env.example
 │   └── package.json
 └── frontend/
     ├── src/
     │   ├── hooks/
-    │   │   ├── useChat.js           # Streaming SSE + AbortController
-    │   │   └── useConversations.js  # Multi-conversations + localStorage
+    │   │   ├── useChat.js             # SSE streaming, AbortController
+    │   │   └── useConversations.js    # Multi-conversation state, localStorage
     │   ├── components/
-    │   │   ├── Sidebar.jsx      # Navigation entre conversations
-    │   │   ├── ChatWindow.jsx   # Fenêtre de chat avec auto-scroll
-    │   │   ├── MessageBubble.jsx # Bulles avec copier + timestamp
-    │   │   ├── InputBar.jsx     # Saisie + bouton Stop
+    │   │   ├── Sidebar.jsx
+    │   │   ├── ChatWindow.jsx
+    │   │   ├── MessageBubble.jsx
+    │   │   ├── InputBar.jsx
     │   │   └── TypingIndicator.jsx
-    │   └── App.jsx             # Composition + sélection modèle
+    │   └── App.jsx
     ├── .env.example
     └── package.json
 ```
 
-## Installation en local
+## Prerequisites
 
-### 1. Backend
+- Node.js 18+
+- A Groq API key — available at [console.groq.com](https://console.groq.com)
+
+## Local Setup
+
+### Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Copier `.env.example` en `.env` et ajouter votre clé API Groq :
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```env
 PORT=3001
-GROQ_API_KEY=votre_cle_groq_ici
+GROQ_API_KEY=your_groq_api_key
 FRONTEND_URL=http://localhost:5173
 ```
 
@@ -74,9 +77,9 @@ FRONTEND_URL=http://localhost:5173
 npm run dev
 ```
 
-Le backend tourne sur `http://localhost:3001`.
+The API server will be available at `http://localhost:3001`.
 
-### 2. Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -84,41 +87,31 @@ npm install
 npm run dev
 ```
 
-L'application est accessible sur `http://localhost:5173`.
+The application will be available at `http://localhost:5173`.
 
-## Obtenir une clé API Groq (gratuit)
+## Deployment
 
-1. Créer un compte sur [console.groq.com](https://console.groq.com)
-2. Aller dans **API Keys** → **Create API Key**
-3. Copier la clé (`gsk_...`) dans `backend/.env`
+### Backend — Render
 
-Les modèles disponibles via Groq sont **entièrement gratuits** avec des limites généreuses.
+1. Push the repository to GitHub (ensure `.env` is listed in `.gitignore`)
+2. Create a new **Web Service** on [Render](https://render.com) and connect the repository
+3. Set the following configuration:
+   - Root Directory: `backend`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+4. Add the required environment variables:
+   - `GROQ_API_KEY` — your Groq API key
+   - `FRONTEND_URL` — your Vercel frontend URL (set after frontend deployment)
+5. Note the service URL provided by Render (e.g., `https://your-app.onrender.com`)
 
-## Déploiement
+### Frontend — Vercel
 
-### Backend sur Render
+1. Create a new project on [Vercel](https://vercel.com) and import the repository
+2. Set Root Directory to `frontend`
+3. Add the environment variable:
+   - `VITE_API_URL` — your Render backend URL
+4. Deploy
 
-1. Pousser le code sur GitHub (vérifier que `.env` est dans `.gitignore`)
-2. Créer un compte sur [Render.com](https://render.com)
-3. **New +** → **Web Service** → connecter le dépôt GitHub
-4. Configuration :
-   - Root Directory : `backend`
-   - Build Command : `npm install`
-   - Start Command : `npm start`
-5. Variables d'environnement :
-   - `GROQ_API_KEY` → votre clé API
-   - `FRONTEND_URL` → URL Vercel de votre frontend (après déploiement)
-6. Copier l'URL fournie par Render (ex: `https://mon-backend.onrender.com`)
+## License
 
-### Frontend sur Vercel
-
-1. Créer un compte sur [Vercel.com](https://vercel.com)
-2. **Add New** → **Project** → importer le dépôt GitHub
-3. Root Directory : `frontend`
-4. Variables d'environnement :
-   - `VITE_API_URL` → URL de votre backend Render
-5. **Deploy**
-
----
-
-*Projet réalisé avec React, Node.js et l'API Groq.*
+MIT
