@@ -1,5 +1,7 @@
 # AI Chat — Full-Stack Conversational Interface
 
+**Live demo:** [chatbot-ia-gilt.vercel.app](https://chatbot-ia-gilt.vercel.app)
+
 A full-stack conversational AI application with real-time token streaming, persistent multi-conversation management, and Markdown rendering.
 
 ## Features
