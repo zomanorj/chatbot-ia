@@ -8,15 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-
-const MODEL_LABELS: Record<string, { label: string; hint: string }> = {
-  "openai/gpt-oss-120b": { label: "GPT-OSS 120B", hint: "Précis" },
-  "openai/gpt-oss-20b": { label: "GPT-OSS 20B", hint: "Rapide" },
-}
-
-function describe(model: string) {
-  return MODEL_LABELS[model] ?? { label: model, hint: "" }
-}
+import { MODEL_LABELS, modelLabel } from "@/lib/format"
 
 export function ModelSelect({
   models,
@@ -33,7 +25,7 @@ export function ModelSelect({
 
   const items = models.map((model) => ({
     value: model,
-    label: describe(model).label,
+    label: modelLabel(model),
   }))
 
   return (
@@ -47,19 +39,16 @@ export function ModelSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {models.map((model) => {
-          const { label, hint } = describe(model)
-          return (
-            <SelectItem key={model} value={model}>
-              {label}
-              {hint && (
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {hint}
-                </span>
-              )}
-            </SelectItem>
-          )
-        })}
+        {models.map((model) => (
+          <SelectItem key={model} value={model}>
+            {modelLabel(model)}
+            {MODEL_LABELS[model] && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {MODEL_LABELS[model].hint}
+              </span>
+            )}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )

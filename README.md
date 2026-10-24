@@ -55,14 +55,16 @@ In Madagascar and across francophone Africa, most small businesses sell through 
 ├── backend/              FastAPI service
 │   ├── app/
 │   │   ├── api/          HTTP routes and dependencies
-│   │   ├── core/         Settings
-│   │   ├── db/           SQLAlchemy base and session
-│   │   └── schemas/      Pydantic models
+│   │   ├── core/         Settings, security, errors, rate limiting
+│   │   ├── db/           SQLAlchemy base, session and column types
+│   │   ├── models/       ORM models
+│   │   ├── schemas/      Request and response models
+│   │   └── services/     Business logic: auth, bots, chat, LLM provider
 │   ├── alembic/          Database migrations
 │   └── tests/
 ├── frontend/             Next.js dashboard and landing page
 │   └── src/
-│       ├── app/          Routes: landing, dashboard, playground
+│       ├── app/          Routes: landing, auth, dashboard, assistants
 │       ├── components/   UI, chat and dashboard components
 │       ├── hooks/        Data and chat state hooks
 │       └── lib/          Typed API client, SSE parser
@@ -75,39 +77,50 @@ In Madagascar and across francophone Africa, most small businesses sell through 
 **Requirements:** Docker with Compose v2, Node.js 24, and [uv](https://docs.astral.sh/uv/getting-started/installation/) to run tooling outside containers.
 
 ```bash
-cp backend/.env.example backend/.env
+cp backend/.env.example backend/.env       # then set SECRET_KEY and GROQ_API_KEY
 make up                                   # API, PostgreSQL, Redis
 
-cd frontend && cp .env.example .env.local && npm install
+(cd frontend && cp .env.example .env.local && npm install)
 make web                                  # dashboard on http://localhost:3000
 ```
 
+The API listens on `http://localhost:8000`, with interactive documentation at `/docs` (disabled in production). If a port is already taken on your machine, copy `.env.example` to `.env` at the repository root and change `POSTGRES_PORT`, `REDIS_PORT` or `API_PORT`.
+
+Set `GROQ_API_KEY` in `backend/.env` to enable chat ([get a key](https://console.groq.com/keys)). Open `http://localhost:3000`, create an account, then an assistant, and test it in its **Tester** tab.
+
+### API overview
+
 | Endpoint | Description |
 |----------|-------------|
-| `GET  /api/v1/health` | Liveness probe |
-| `GET  /api/v1/health/ready` | Readiness probe, checks PostgreSQL and Redis (503 when degraded) |
-| `GET  /api/v1/chat/models` | Available language models and the default one |
-| `POST /api/v1/chat/stream` | Streams an assistant reply over Server-Sent Events |
-| `GET  /docs` | Interactive OpenAPI documentation (disabled in production) |
+| `POST /api/v1/auth/register` | Create an account and its organization |
+| `POST /api/v1/auth/login` | Open a session |
+| `POST /api/v1/auth/refresh` | Rotate the refresh cookie and get a new access token |
+| `POST /api/v1/auth/logout` | Revoke the session |
+| `GET  /api/v1/auth/me` | Current user and organizations |
+| `GET, POST /api/v1/bots` | List or create assistants |
+| `GET, PATCH, DELETE /api/v1/bots/{id}` | Read, update or delete an assistant |
+| `GET  /api/v1/bots/{id}/conversations` | Latest conversations of an assistant |
+| `GET, DELETE /api/v1/bots/{id}/conversations/{cid}` | Read or delete a conversation |
+| `POST /api/v1/bots/{id}/chat` | Send a message and stream the reply (SSE) |
+| `GET  /api/v1/chat/models` | Available language models |
+| `GET  /api/v1/health`, `/health/ready` | Liveness and readiness probes |
 
-The API listens on `http://localhost:8000`. If a port is already taken on your machine, copy `.env.example` to `.env` at the repository root and change `POSTGRES_PORT`, `REDIS_PORT` or `API_PORT`.
+### Authentication and tenancy
 
-Set `GROQ_API_KEY` in `backend/.env` to enable chat ([get a key](https://console.groq.com/keys)), then:
-
-```bash
-curl -N http://localhost:8000/api/v1/chat/stream \
-  -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "Salama!"}]}'
-```
+- Passwords are hashed with Argon2 ([pwdlib](https://frankie567.github.io/pwdlib/)). Unknown emails still run a hash check, so response times do not reveal which accounts exist.
+- Access tokens are short-lived JWTs (15 minutes) kept in memory by the dashboard and sent as `Authorization: Bearer`.
+- Refresh tokens are opaque, single-use, stored as SHA-256 hashes and delivered in an `httpOnly` cookie scoped to `/api/v1/auth`. Replaying a used token revokes every session of the user. The dashboard serializes refreshes across tabs with the Web Locks API.
+- Every resource belongs to an organization. Requests are scoped to the caller's organization (or the one named in `X-Organization-ID`), and resources of other organizations answer `404`, never `403`, so their existence is not disclosed.
 
 ### Streaming protocol
 
-`POST /api/v1/chat/stream` accepts up to 50 messages (4,000 characters each, 16,000 in total). The last message must come from the user. The response is a stream of named events:
+`POST /api/v1/bots/{id}/chat` takes `{"content": "...", "conversation_id": null, "model": null}`. Without `conversation_id`, a new conversation is created. The user message is stored before streaming starts, and the reply is stored when it ends, including partial replies when the client disconnects. Events:
 
 | Event | Payload | Meaning |
 |-------|---------|---------|
+| `conversation` | `{"id": "...", "title": "..."}` | Conversation the turn belongs to |
 | `token` | `{"text": "..."}` | Next fragment of the reply |
-| `done` | `{"model": "..."}` | Reply completed |
+| `done` | `{"model": "...", "message_id": "..."}` | Reply completed and stored |
 | `error` | `{"code": "...", "message": "..."}` | Provider failure, the stream ends |
 
 Errors raised before streaming starts use HTTP status codes and a single envelope:
@@ -116,11 +129,15 @@ Errors raised before streaming starts use HTTP status codes and a single envelop
 { "error": { "code": "rate_limited", "message": "Too many requests. Please try again later." } }
 ```
 
-| Status | Code | Cause |
-|--------|------|-------|
-| 422 | `validation_error`, `unknown_model` | Invalid payload or model not allowed |
-| 429 | `rate_limited` | Per-IP limit reached (`CHAT_RATE_LIMIT`), see `Retry-After` |
-| 503 | `llm_not_configured` | No provider API key on the server |
+| Status | Codes |
+|--------|-------|
+| 401 | `not_authenticated`, `invalid_credentials`, `invalid_session` |
+| 403 | `organization_forbidden` |
+| 404 | `bot_not_found`, `conversation_not_found` |
+| 409 | `email_taken` |
+| 422 | `validation_error`, `unknown_model` |
+| 429 | `rate_limited`, with `Retry-After` |
+| 503 | `llm_not_configured` |
 
 ### Design system
 
@@ -139,7 +156,7 @@ Icons come from [Lucide](https://lucide.dev).
 
 ```bash
 make watch      # live code sync into the API container
-make test       # run the test suite
+make test       # backend tests run against PostgreSQL (database mpanampy_test, created automatically)
 make lint       # Ruff lint and format check
 make revision m="describe change"   # new Alembic migration
 make web-types  # regenerate typed API client after backend changes
@@ -152,7 +169,7 @@ Install the git hooks once with `uvx pre-commit install`.
 - [x] Foundations: monorepo, containers, health checks, CI
 - [x] Streaming chat API
 - [x] Next.js dashboard
-- [ ] Accounts and multi-tenant isolation
+- [x] Accounts and multi-tenant isolation
 - [ ] Document ingestion and RAG with source citations
 - [ ] Embeddable website widget
 - [ ] Facebook Messenger integration

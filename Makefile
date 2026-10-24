@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := help
+-include .env
+POSTGRES_PORT ?= 5432
 UV := cd backend && uv run
+TEST_DATABASE_URL ?= postgresql+asyncpg://mpanampy:mpanampy@localhost:$(POSTGRES_PORT)/mpanampy_test
 
 .PHONY: help up watch down logs migrate revision test lint format web web-types
 
@@ -24,8 +27,8 @@ migrate: ## Apply database migrations
 revision: ## Create a migration: make revision m="add users"
 	$(UV) alembic revision --autogenerate -m "$(m)"
 
-test: ## Run backend and frontend tests
-	$(UV) pytest
+test: ## Run backend (needs the db container) and frontend tests
+	cd backend && TEST_DATABASE_URL=$(TEST_DATABASE_URL) uv run pytest
 	cd frontend && npm test
 
 lint: ## Lint, type-check and check formatting

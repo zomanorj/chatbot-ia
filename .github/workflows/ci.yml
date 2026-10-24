@@ -19,6 +19,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg18-trixie
+        env:
+          POSTGRES_USER: mpanampy
+          POSTGRES_PASSWORD: mpanampy
+          POSTGRES_DB: mpanampy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mpanampy"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://mpanampy:mpanampy@localhost:5432/mpanampy_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

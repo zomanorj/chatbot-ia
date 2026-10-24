@@ -90,8 +90,14 @@ export default function HomePage() {
               Fonctionnalités
             </Link>
             <ThemeToggle />
-            <Link href="/dashboard" className={buttonVariants()}>
-              Tableau de bord
+            <Link
+              href="/login"
+              className={buttonVariants({ variant: "ghost" })}
+            >
+              Se connecter
+            </Link>
+            <Link href="/register" className={buttonVariants()}>
+              Commencer
             </Link>
           </nav>
         </div>
@@ -119,10 +125,10 @@ export default function HomePage() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/dashboard/playground"
+                  href="/register"
                   className={buttonVariants({ size: "lg" })}
                 >
-                  Essayer maintenant
+                  Créer mon assistant
                   <ArrowRight data-icon="inline-end" />
                 </Link>
                 <Link

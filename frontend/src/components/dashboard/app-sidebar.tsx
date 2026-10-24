@@ -1,12 +1,11 @@
 "use client"
 
 import {
-  ArrowLeft,
   Bot,
+  ChartColumn,
   FileText,
   LayoutDashboard,
   Menu,
-  MessageSquareText,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -17,7 +16,6 @@ import { cn } from "cn"
 
 import { Logo } from "@/components/brand/logo"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -26,25 +24,29 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 
+import { UserMenu } from "./user-menu"
+
 interface NavItem {
   href: string
   label: string
   icon: LucideIcon
+  exact?: boolean
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Vue d'ensemble", icon: LayoutDashboard },
   {
-    href: "/dashboard/playground",
-    label: "Playground",
-    icon: MessageSquareText,
+    href: "/dashboard",
+    label: "Vue d'ensemble",
+    icon: LayoutDashboard,
+    exact: true,
   },
+  { href: "/dashboard/bots", label: "Assistants", icon: Bot },
 ]
 
 const UPCOMING: Omit<NavItem, "href">[] = [
-  { label: "Assistants", icon: Bot },
   { label: "Documents", icon: FileText },
   { label: "Prospects", icon: Users },
+  { label: "Statistiques", icon: ChartColumn },
 ]
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -61,8 +63,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         className="flex flex-1 flex-col gap-6"
       >
         <ul className="space-y-0.5">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href
+          {NAV.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact ? pathname === href : pathname.startsWith(href)
             return (
               <li key={href}>
                 <Link
@@ -102,18 +104,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </nav>
 
-      <div className="flex items-center justify-between border-t pt-3">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 px-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Site
-        </Link>
-        <div className="flex items-center gap-1">
-          <Badge variant="outline">v0.1</Badge>
-          <ThemeToggle />
-        </div>
+      <div className="flex items-center gap-1 border-t pt-3">
+        <UserMenu />
+        <ThemeToggle />
       </div>
     </div>
   )

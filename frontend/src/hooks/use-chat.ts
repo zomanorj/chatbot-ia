@@ -1,9 +1,13 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef, useState } from "react"
 
 import { streamChat } from "@/lib/api/chat"
+import type { StoredMessage } from "@/lib/api/types"
 import { describeError, describeErrorCode } from "@/lib/errors"
+
+import { conversationKeys } from "./use-conversations"
 
 export type MessageStatus = "streaming" | "done" | "stopped" | "error"
 
@@ -29,7 +33,19 @@ function createMessage(
   }
 }
 
-export function useChat(model?: string) {
+export function fromStored(messages: StoredMessage[]): Message[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    createdAt: m.created_at,
+    status: "done",
+  }))
+}
+
+export function useChat(botId: string, model?: string | null) {
+  const queryClient = useQueryClient()
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -49,30 +65,30 @@ export function useChat(model?: string) {
       const text = content.trim()
       if (!text || controllerRef.current) return
 
-      const user = createMessage("user", text, "done")
       const assistant = createMessage("assistant", "", "streaming")
-      // Only completed turns are sent back as context.
-      const history = messages
-        .filter((m) => m.content && m.status !== "error")
-        .map(({ role, content }) => ({ role, content }))
-
       setError(null)
-      setMessages((current) => [...current, user, assistant])
+      setMessages((current) => [
+        ...current,
+        createMessage("user", text, "done"),
+        assistant,
+      ])
       setIsStreaming(true)
       const controller = new AbortController()
       controllerRef.current = controller
 
       try {
         const stream = streamChat(
-          { messages: [...history, { role: "user", content: text }], model },
+          botId,
+          { content: text, conversation_id: conversationId, model },
           controller.signal,
         )
         for await (const event of stream) {
-          if (event.type === "token") {
+          if (event.type === "conversation") setConversationId(event.id)
+          else if (event.type === "token") {
             update(assistant.id, (m) => ({ content: m.content + event.text }))
-          } else if (event.type === "done") {
+          } else if (event.type === "done")
             update(assistant.id, () => ({ status: "done" }))
-          } else {
+          else {
             update(assistant.id, () => ({ status: "error" }))
             setError(describeErrorCode(event.code, event.message))
           }
@@ -87,18 +103,26 @@ export function useChat(model?: string) {
       } finally {
         controllerRef.current = null
         setIsStreaming(false)
+        void queryClient.invalidateQueries({
+          queryKey: conversationKeys.list(botId),
+        })
       }
     },
-    [messages, model, update],
+    [botId, conversationId, model, queryClient, update],
   )
 
   const stop = useCallback(() => controllerRef.current?.abort(), [])
 
-  const reset = useCallback(() => {
-    controllerRef.current?.abort()
-    setMessages([])
-    setError(null)
-  }, [])
+  /** Switches to a stored conversation, or to a blank one when called without arguments. */
+  const load = useCallback(
+    (id: string | null = null, stored: StoredMessage[] = []) => {
+      controllerRef.current?.abort()
+      setConversationId(id)
+      setMessages(fromStored(stored))
+      setError(null)
+    },
+    [],
+  )
 
-  return { messages, error, isStreaming, send, stop, reset }
+  return { conversationId, messages, error, isStreaming, send, stop, load }
 }
