@@ -45,7 +45,7 @@ async def test_first_message_creates_a_conversation(
 
     assert response.status_code == 200
     events = parse_sse(response.text)
-    assert [name for name, _ in events] == ["conversation", "token", "token", "done"]
+    assert [name for name, _ in events] == ["conversation", "sources", "token", "token", "done"]
     conversation = events[0][1]
     assert conversation["title"] == "Salama! Mbola misy ve ny akanjo mena?"
     assert events[-1][1]["model"] == get_settings().llm_default_model
@@ -97,7 +97,7 @@ async def test_provider_failure_keeps_partial_reply(
     fake_llm.fail_after = 1
     events = parse_sse((await send(client, auth_headers, bot, "Bonjour")).text)
 
-    assert [name for name, _ in events] == ["conversation", "token", "error"]
+    assert [name for name, _ in events] == ["conversation", "sources", "token", "error"]
     detail = await client.get(
         f"/api/v1/bots/{bot['id']}/conversations/{events[0][1]['id']}", headers=auth_headers
     )

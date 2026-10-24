@@ -3,17 +3,9 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import FakeLLM, register
+from tests.conftest import FakeLLM, create_bot, register
 
 pytestmark = pytest.mark.anyio
-
-
-async def create_bot(client: AsyncClient, headers: dict, **fields) -> dict:
-    response = await client.post(
-        "/api/v1/bots", headers=headers, json={"name": "Vendeur Ravaka", **fields}
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
 
 
 async def test_bot_lifecycle(client: AsyncClient, auth_headers: dict) -> None:

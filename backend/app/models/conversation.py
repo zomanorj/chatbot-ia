@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin
@@ -45,5 +46,7 @@ class Message(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     role: Mapped[MessageRole] = mapped_column(str_enum(MessageRole))
     content: Mapped[str] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(String(100))
+    # Documents the reply was grounded on: [{"document_id", "title"}].
+    sources: Mapped[list[dict] | None] = mapped_column(JSONB)
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")

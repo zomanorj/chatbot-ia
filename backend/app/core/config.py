@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     chat_rate_limit: str = "20/minute"
     auth_rate_limit: str = "10/minute"
 
+    # Knowledge base
+    embedding_model: str = "intfloat/multilingual-e5-small"
+    embedding_cache_dir: str | None = None
+    max_upload_mb: int = 10
+    rag_top_k: int = 5
+    # Cosine similarities (E5 scores sit between 0.7 and 0.95, see eval/).
+    # Passages above the floor are given to the model; the confidence threshold decides
+    # which ones are shown as sources and when a question is logged as unanswered.
+    rag_context_floor: float = 0.75
+    rag_min_score: float = 0.83
+    rag_query_rewrite: bool = True
+    rag_rewrite_model: str = "openai/gpt-oss-20b"
+    worker_poll_seconds: float = 2.0
+
     # Generate with: openssl rand -hex 32
     secret_key: SecretStr = SecretStr(DEV_SECRET_KEY)
     access_token_ttl_minutes: int = 15

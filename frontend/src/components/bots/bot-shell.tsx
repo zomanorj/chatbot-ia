@@ -28,6 +28,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { segment: "", label: "Tester", icon: SquareTerminal },
+  { segment: "/documents", label: "Documents", icon: FileText },
   { segment: "/conversations", label: "Conversations", icon: MessagesSquare },
   { segment: "/settings", label: "Réglages", icon: Settings2 },
 ]
@@ -99,13 +100,6 @@ export function BotShell({ children }: { children: React.ReactNode }) {
               </Link>
             )
           })}
-          <span className="flex cursor-not-allowed items-center gap-2 border-b-2 border-transparent px-3 py-2.5 text-sm whitespace-nowrap text-muted-foreground/60">
-            <FileText className="size-4" />
-            Documents
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-              Bientôt
-            </span>
-          </span>
         </nav>
       </div>
       {children}

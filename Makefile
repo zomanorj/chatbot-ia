@@ -4,7 +4,7 @@ POSTGRES_PORT ?= 5432
 UV := cd backend && uv run
 TEST_DATABASE_URL ?= postgresql+asyncpg://mpanampy:mpanampy@localhost:$(POSTGRES_PORT)/mpanampy_test
 
-.PHONY: help up watch down logs migrate revision test lint format web web-types
+.PHONY: help up watch down logs migrate revision test lint format web web-types eval
 
 help: ## List available commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -18,8 +18,8 @@ watch: ## Start the stack with live sync of backend code
 down: ## Stop the stack
 	docker compose down
 
-logs: ## Follow API logs
-	docker compose logs -f api
+logs: ## Follow API and worker logs
+	docker compose logs -f api worker
 
 migrate: ## Apply database migrations
 	docker compose run --rm migrate
@@ -44,3 +44,6 @@ web: ## Start the Next.js dev server on port 3000
 
 web-types: ## Regenerate frontend API types from the running backend
 	cd frontend && npm run api:types
+
+eval: ## Evaluate RAG quality on the sample business (needs GROQ_API_KEY)
+	$(UV) python -m eval.run

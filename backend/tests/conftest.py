@@ -1,4 +1,7 @@
+import hashlib
+import math
 import os
+import re
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 
@@ -27,6 +30,14 @@ class FakeLLM:
         self.tokens = tokens
         self.fail_after = fail_after
         self.calls: list[dict] = []
+        self.rewrite: str | None = None
+        self.complete_calls: list[dict] = []
+
+    async def complete(
+        self, messages: Sequence[ChatMessage], *, model: str, system_prompt: str, max_tokens: int
+    ) -> str:
+        self.complete_calls.append({"messages": list(messages), "model": model})
+        return self.rewrite if self.rewrite is not None else messages[-1].content
 
     async def stream(
         self, messages: Sequence[ChatMessage], *, model: str, system_prompt: str
@@ -41,6 +52,25 @@ class FakeLLM:
 
     async def aclose(self) -> None:
         pass
+
+
+class FakeEmbedder:
+    """Hashed bag of words: texts sharing words get similar vectors, deterministically."""
+
+    dim = 384
+
+    def _vector(self, text: str) -> list[float]:
+        vector = [0.0] * self.dim
+        for word in re.findall(r"\w+", text.lower()):
+            vector[int(hashlib.md5(word.encode()).hexdigest(), 16) % self.dim] += 1.0
+        norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+        return [v / norm for v in vector]
+
+    async def embed_passages(self, texts: Sequence[str]) -> list[list[float]]:
+        return [self._vector(t) for t in texts]
+
+    async def embed_query(self, text: str) -> list[float]:
+        return self._vector(text)
 
 
 @pytest.fixture(scope="session")
@@ -89,6 +119,7 @@ async def client() -> AsyncIterator[AsyncClient]:
     # ASGITransport skips the lifespan: services are wired explicitly per test.
     app.state.rate_limiter = RateLimiter("async+memory://")
     app.state.llm = None
+    app.state.embedder = FakeEmbedder()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
@@ -99,6 +130,14 @@ def fake_llm() -> FakeLLM:
     llm = FakeLLM()
     app.state.llm = llm
     return llm
+
+
+async def create_bot(client: AsyncClient, headers: dict, **fields) -> dict:
+    response = await client.post(
+        "/api/v1/bots", headers=headers, json={"name": "Vendeur Ravaka", **fields}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 async def register(

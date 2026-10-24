@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Copy } from "lucide-react"
+import { Check, Copy, FileText } from "lucide-react"
 import { useState } from "react"
 import { cn } from "cn"
 
@@ -96,6 +96,19 @@ export function ChatMessage({ message }: { message: Message }) {
           <Markdown>{message.content}</Markdown>
         ) : (
           isStreaming && <TypingDots />
+        )}
+        {!isStreaming && message.sources && message.sources.length > 0 && (
+          <ul aria-label="Sources" className="flex flex-wrap gap-1.5 pt-1">
+            {message.sources.map((source) => (
+              <li
+                key={source.document_id}
+                className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground"
+              >
+                <FileText className="size-3.5" />
+                {source.title}
+              </li>
+            ))}
+          </ul>
         )}
         <div
           className={cn(

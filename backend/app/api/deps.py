@@ -13,6 +13,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.core.security import decode_access_token
 from app.models import Membership, Role, User
+from app.services.embeddings import Embedder
 from app.services.llm import LLMProvider
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -31,10 +32,15 @@ def get_llm(request: Request) -> LLMProvider | None:
     return getattr(request.app.state, "llm", None)
 
 
+def get_embedder(request: Request) -> Embedder:
+    return request.app.state.embedder
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 LLMDep = Annotated[LLMProvider | None, Depends(get_llm)]
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 
 
 def _unauthenticated(message: str = "Authentication required.") -> AppError:

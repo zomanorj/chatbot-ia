@@ -23,7 +23,32 @@ class LLMProvider(Protocol):
         self, messages: Sequence[ChatMessage], *, model: str, system_prompt: str
     ) -> AsyncIterator[str]: ...
 
+    async def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        model: str,
+        system_prompt: str,
+        max_tokens: int,
+    ) -> str: ...
+
     async def aclose(self) -> None: ...
+
+
+def _payload(messages: Sequence[ChatMessage], system_prompt: str) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": system_prompt},
+        *({"role": m.role, "content": m.content} for m in messages),
+    ]
+
+
+def _translate_error(exc: groq.APIError) -> LLMError:
+    if isinstance(exc, groq.RateLimitError):
+        return LLMError("provider_busy", "The AI service is busy. Please retry shortly.")
+    if isinstance(exc, groq.APIConnectionError):
+        return LLMError("provider_unreachable", "The AI service is unreachable.")
+    logger.error("Groq API error: %s", exc)
+    return LLMError("provider_error", "The AI service failed to answer.")
 
 
 class GroqProvider:
@@ -33,24 +58,36 @@ class GroqProvider:
     async def stream(
         self, messages: Sequence[ChatMessage], *, model: str, system_prompt: str
     ) -> AsyncIterator[str]:
-        payload = [{"role": "system", "content": system_prompt}]
-        payload += [{"role": m.role, "content": m.content} for m in messages]
         try:
             response = await self._client.chat.completions.create(
-                model=model, messages=payload, stream=True
+                model=model, messages=_payload(messages, system_prompt), stream=True
             )
             async for chunk in response:
                 if chunk.choices and (text := chunk.choices[0].delta.content):
                     yield text
-        except groq.RateLimitError as exc:
-            raise LLMError(
-                "provider_busy", "The AI service is busy. Please retry shortly."
-            ) from exc
-        except groq.APIConnectionError as exc:
-            raise LLMError("provider_unreachable", "The AI service is unreachable.") from exc
         except groq.APIError as exc:
-            logger.exception("Groq API error")
-            raise LLMError("provider_error", "The AI service failed to answer.") from exc
+            raise _translate_error(exc) from exc
+
+    async def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        model: str,
+        system_prompt: str,
+        max_tokens: int,
+    ) -> str:
+        """Short non-streaming call for internal tasks. Reasoning is kept minimal and hidden."""
+        try:
+            response = await self._client.chat.completions.create(
+                model=model,
+                messages=_payload(messages, system_prompt),
+                max_completion_tokens=max_tokens,
+                reasoning_effort="low",
+                include_reasoning=False,
+            )
+        except groq.APIError as exc:
+            raise _translate_error(exc) from exc
+        return (response.choices[0].message.content or "").strip()
 
     async def aclose(self) -> None:
         await self._client.close()

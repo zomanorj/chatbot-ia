@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from app.api.deps import LLMDep, SessionDep, SettingsDep, user_rate_limit
+from app.api.deps import EmbedderDep, LLMDep, SessionDep, SettingsDep, user_rate_limit
 from app.api.v1.routes.bots import BotDep
 from app.core.errors import AppError
 from app.schemas.chat import ChatTurnRequest, ModelList
@@ -33,6 +33,7 @@ async def prepare_chat(
     session: SessionDep,
     settings: SettingsDep,
     llm: LLMDep,
+    embedder: EmbedderDep,
 ) -> ChatContext:
     # Depends on the body, so it runs after validation and before the stream starts.
     if llm is None:
@@ -54,7 +55,14 @@ async def prepare_chat(
             session, bot.id, payload.conversation_id, with_messages=False
         )
     turn = await start_turn(
-        session, bot, content=payload.content, conversation=conversation, model=model
+        session,
+        bot,
+        content=payload.content,
+        conversation=conversation,
+        model=model,
+        llm=llm,
+        embedder=embedder,
+        settings=settings,
     )
     return ChatContext(turn=turn, llm=llm)
 
@@ -69,7 +77,7 @@ async def chat(
 ) -> AsyncIterable[ServerSentEvent]:
     """Send a message to an assistant and stream its reply.
 
-    Events: `conversation`, then `token`*, then `done` or `error`.
+    Events: `conversation`, `sources`, then `token`*, then `done` or `error`.
     """
     async for event in stream_turn(session, context.llm, context.turn):
         yield event

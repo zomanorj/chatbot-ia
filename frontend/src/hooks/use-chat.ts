@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef, useState } from "react"
 
 import { streamChat } from "@/lib/api/chat"
-import type { StoredMessage } from "@/lib/api/types"
+import type { Source, StoredMessage } from "@/lib/api/types"
 import { describeError, describeErrorCode } from "@/lib/errors"
 
 import { conversationKeys } from "./use-conversations"
@@ -17,6 +17,7 @@ export interface Message {
   content: string
   createdAt: string
   status: MessageStatus
+  sources?: Source[]
 }
 
 function createMessage(
@@ -40,6 +41,7 @@ export function fromStored(messages: StoredMessage[]): Message[] {
     content: m.content,
     createdAt: m.created_at,
     status: "done",
+    sources: m.sources ?? undefined,
   }))
 }
 
@@ -84,7 +86,9 @@ export function useChat(botId: string, model?: string | null) {
         )
         for await (const event of stream) {
           if (event.type === "conversation") setConversationId(event.id)
-          else if (event.type === "token") {
+          else if (event.type === "sources") {
+            update(assistant.id, () => ({ sources: event.sources }))
+          } else if (event.type === "token") {
             update(assistant.id, (m) => ({ content: m.content + event.text }))
           } else if (event.type === "done")
             update(assistant.id, () => ({ status: "done" }))

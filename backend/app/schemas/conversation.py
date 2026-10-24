@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.models import Channel, MessageRole
+from app.schemas.chat import Source
 
 
 class ConversationSummary(BaseModel):
@@ -23,6 +24,7 @@ class MessageRead(BaseModel):
     role: MessageRole
     content: str
     model: str | None
+    sources: list[Source] | None
     created_at: datetime
 
 

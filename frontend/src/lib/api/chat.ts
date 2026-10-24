@@ -1,9 +1,11 @@
 import { parseSSE } from "@/lib/sse"
 
 import { api, toApiError } from "./client"
+import type { Source } from "./types"
 
 export type ChatEvent =
   | { type: "conversation"; id: string; title: string }
+  | { type: "sources"; sources: Source[] }
   | { type: "token"; text: string }
   | { type: "done"; model: string; messageId: string | null }
   | { type: "error"; code: string; message: string }
@@ -33,6 +35,9 @@ export async function* streamChat(
     switch (message.event) {
       case "conversation":
         yield { type: "conversation", id: payload.id, title: payload.title }
+        break
+      case "sources":
+        yield { type: "sources", sources: payload.sources }
         break
       case "token":
         yield { type: "token", text: payload.text }

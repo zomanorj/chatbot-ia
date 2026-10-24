@@ -6,12 +6,18 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.1",
     "asyncpg>=0.32.0",
+    "defusedxml>=0.7.1",
     "fastapi[standard]>=0.162.0",
+    "fastembed==0.9.0",
     "groq>=1.7.0",
     "limits>=5.8.0",
+    "openpyxl>=3.1.5",
+    "pgvector>=0.5.1",
     "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.1",
     "pyjwt>=2.15.1",
+    "pypdf>=6.21.2",
+    "python-docx>=1.2.0",
     "redis>=8.1.0",
     "sqlalchemy[asyncio]>=2.1.6",
 ]
@@ -34,5 +40,6 @@ addopts = "-ra"
 dev = [
     "anyio>=4.15.1",
     "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
     "ruff>=0.17.2",
 ]

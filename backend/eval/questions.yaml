@@ -1,0 +1,61 @@
+# must_include: every group must match; a group lists accepted alternatives.
+# must_not_include: regular expressions that must not appear in the answer (fabricated facts).
+# Matching ignores case, accents and spaces inside numbers ("45 000" == "45000").
+- {id: price-dress-fr, lang: fr, kind: answerable, source: catalogue.csv,
+   question: "Combien coûte la robe longue en coton ?", must_include: [["45000"]]}
+- {id: price-dress-mg, lang: mg, kind: answerable, source: catalogue.csv,
+   question: "Ohatrinona ny akanjo lava landihazo?", must_include: [["45000"]]}
+- {id: stock-linen-fr, lang: fr, kind: answerable, source: catalogue.csv,
+   question: "La robe courte en lin est-elle disponible ?", must_include: [["rupture", "plus en stock", "pas disponible", "indisponible", "epuise", "plus disponible"]]}
+- {id: sizes-shirt-fr, lang: fr, kind: answerable, source: catalogue.csv,
+   question: "Quelles tailles pour la chemise brodée ?", must_include: [["xxl"]]}
+- {id: sizes-sandals-en, lang: en, kind: answerable, source: catalogue.csv,
+   question: "Do you have the leather sandals in size 42?", must_include: [["yes", "available", "42"]]}
+- {id: hat-mg, lang: mg, kind: answerable, source: catalogue.csv,
+   question: "Ohatrinona ny satroka penjy?", must_include: [["15000"]]}
+- {id: scarf-fr, lang: fr, kind: answerable, source: catalogue.csv,
+   question: "Vous avez des écharpes en soie ? À quel prix ?", must_include: [["60000"]]}
+- {id: kids-fr, lang: fr, kind: answerable, source: catalogue.csv,
+   question: "Avez-vous des vêtements pour un enfant de 6 ans ?", must_include: [["ensemble", "6 ans"]]}
+- {id: chino-colors-en, lang: en, kind: answerable, source: catalogue.csv,
+   question: "Which colours does the chino come in?", must_include: [["beige"], ["black", "noir"]]}
+- {id: address-fr, lang: fr, kind: answerable, source: faq.md,
+   question: "Où se trouve votre magasin ?", must_include: [["analakely"]]}
+- {id: address-mg, lang: mg, kind: answerable, source: faq.md,
+   question: "Aiza no misy ny fivarotanareo?", must_include: [["analakely", "rainitovo"]]}
+- {id: hours-fr, lang: fr, kind: answerable, source: faq.md,
+   question: "Êtes-vous ouverts le dimanche ?", must_include: [["ferme", "non", "pas ouvert", "lundi au samedi"]]}
+- {id: hours-mg, lang: mg, kind: answerable, source: faq.md,
+   question: "Amin'ny firy no misokatra ny fivarotana?", must_include: [["8h30", "8 h 30", "8:30"]]}
+- {id: hours-en, lang: en, kind: answerable, source: faq.md,
+   question: "What time do you close on Saturday?", must_include: [["18", "6 pm", "6pm"]]}
+- {id: payment-fr, lang: fr, kind: answerable, source: faq.md,
+   question: "Je peux payer par carte bancaire ?", must_include: [["non", "pas accept", "ne sont pas"]]}
+- {id: payment-mg, lang: mg, kind: answerable, source: faq.md,
+   question: "Inona avy ny fomba fandoavam-bola azo ampiasaina?", must_include: [["mvola"]]}
+- {id: returns-fr, lang: fr, kind: answerable, source: faq.md,
+   question: "Je peux échanger un article qui ne me va pas ?", must_include: [["7 jours", "sept jours"]]}
+- {id: returns-mg, lang: mg, kind: answerable, source: faq.md,
+   question: "Afaka manakalo entana ve aho raha tsy mety amiko?", must_include: [["7"]]}
+- {id: alterations-fr, lang: fr, kind: answerable, source: faq.md,
+   question: "Faites-vous les ourlets ?", must_include: [["gratuit"]]}
+- {id: contact-en, lang: en, kind: answerable, source: faq.md,
+   question: "What is your WhatsApp number?", must_include: [["034 55 123 45", "0345512345"]]}
+- {id: delivery-free-fr, lang: fr, kind: answerable, source: livraison.txt,
+   question: "La livraison est-elle gratuite à Tana ?", must_include: [["50000"]]}
+- {id: delivery-free-mg, lang: mg, kind: answerable, source: livraison.txt,
+   question: "Maimaim-poana ve ny fanaterana any Antananarivo?", must_include: [["50000"]]}
+- {id: delivery-same-day-fr, lang: fr, kind: answerable, source: livraison.txt,
+   question: "Si je commande ce matin, je suis livré quand ?", must_include: [["jour meme", "aujourd"]]}
+- {id: delivery-province-mg, lang: mg, kind: answerable, source: livraison.txt,
+   question: "Mandefa entana any Toamasina ve ianareo?", must_include: [["8000"]]}
+- {id: delivery-abroad-en, lang: en, kind: answerable, source: livraison.txt,
+   question: "Can you ship to France?", must_include: [["no", "not", "don't", "do not"]]}
+- {id: laptops-en, lang: en, kind: unanswerable,
+   question: "Do you sell laptops?", must_not_include: ['\d[\d ]*\s*ar\b']}
+- {id: loyalty-fr, lang: fr, kind: unanswerable,
+   question: "Avez-vous une carte de fidélité ?", must_not_include: ['\d\s*%']}
+- {id: wedding-mg, lang: mg, kind: unanswerable,
+   question: "Manofa akanjo fampakaram-bady ve ianareo?", must_not_include: ['\d[\d ]*\s*ar\b']}
+- {id: hello-fr, lang: fr, kind: smalltalk, question: "Bonjour !"}
+- {id: thanks-mg, lang: mg, kind: smalltalk, question: "Misaotra betsaka!"}

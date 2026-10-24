@@ -50,6 +50,8 @@ services:
     environment: *backend-env
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -65,6 +67,30 @@ services:
         - action: rebuild
           path: ./backend/uv.lock
 
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.workers.ingestion"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment: *backend-env
+    volumes:
+      - models:/models
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend/app
+          target: /app/app
+        - action: rebuild
+          path: ./backend/uv.lock
+
 volumes:
   pgdata:
   redisdata:
+  # Embedding model files (about 500 MB), downloaded once.
+  models:

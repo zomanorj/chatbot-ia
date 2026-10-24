@@ -1,13 +1,14 @@
 import uuid
 from collections.abc import AsyncIterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import anyio
 from fastapi.sse import ServerSentEvent
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Bot, Channel, Conversation, Message, MessageRole
+from app.core.config import Settings
+from app.models import Bot, Channel, Chunk, Conversation, Message, MessageRole, UnansweredQuestion
 from app.schemas.chat import (
     MAX_HISTORY_CHARS,
     MAX_HISTORY_MESSAGES,
@@ -15,10 +16,15 @@ from app.schemas.chat import (
     ConversationEvent,
     DoneEvent,
     ErrorEvent,
+    SourcesEvent,
     TokenEvent,
 )
+from app.services.embeddings import Embedder
+from app.services.leads import record_leads
 from app.services.llm import LLMError, LLMProvider
 from app.services.prompts import build_system_prompt
+from app.services.query_rewrite import rewrite_query
+from app.services.retrieval import Passage, search
 
 TITLE_LENGTH = 60
 
@@ -29,6 +35,7 @@ class Turn:
     history: Sequence[ChatMessage]
     model: str
     system_prompt: str
+    sources: list[dict] = field(default_factory=list)
 
 
 def make_title(text: str) -> str:
@@ -51,6 +58,60 @@ def fit_history(messages: Sequence[Message]) -> list[ChatMessage]:
     return list(reversed(kept))
 
 
+def distinct_sources(passages: Sequence[Passage]) -> list[dict]:
+    sources: dict[uuid.UUID, dict] = {}
+    for passage in passages:
+        sources.setdefault(
+            passage.document_id, {"document_id": str(passage.document_id), "title": passage.title}
+        )
+    return list(sources.values())
+
+
+@dataclass(frozen=True)
+class Grounding:
+    context: list[Passage]
+    sources: list[Passage]
+    has_knowledge: bool
+
+
+async def _ground(
+    session: AsyncSession,
+    bot: Bot,
+    history: Sequence[ChatMessage],
+    conversation: Conversation,
+    *,
+    llm: LLMProvider,
+    embedder: Embedder,
+    settings: Settings,
+) -> Grounding:
+    has_knowledge = await session.scalar(select(exists().where(Chunk.bot_id == bot.id)))
+    if not has_knowledge:
+        return Grounding([], [], False)
+
+    question = history[-1].content
+    queries = (
+        await rewrite_query(llm, history, settings.rag_rewrite_model)
+        if settings.rag_query_rewrite
+        else [question]
+    )
+    if not queries:
+        return Grounding([], [], True)
+
+    passages = await search(session, embedder, bot.id, queries, limit=settings.rag_top_k)
+    context = [p for p in passages if p.score >= settings.rag_context_floor]
+    confident = [p for p in context if p.score >= settings.rag_min_score]
+    if not confident:
+        session.add(
+            UnansweredQuestion(
+                bot_id=bot.id,
+                conversation_id=conversation.id,
+                question=question,
+                best_score=passages[0].score if passages else None,
+            )
+        )
+    return Grounding(context, confident, True)
+
+
 async def start_turn(
     session: AsyncSession,
     bot: Bot,
@@ -58,9 +119,12 @@ async def start_turn(
     content: str,
     conversation: Conversation | None,
     model: str,
+    llm: LLMProvider,
+    embedder: Embedder,
+    settings: Settings,
     channel: Channel = Channel.PLAYGROUND,
 ) -> Turn:
-    """Persist the user message before streaming so it survives provider failures."""
+    """Persist the user message, then retrieve the knowledge the reply should rely on."""
     if conversation is None:
         conversation = Conversation(bot_id=bot.id, channel=channel, title=make_title(content))
         session.add(conversation)
@@ -69,6 +133,7 @@ async def start_turn(
     session.add(Message(conversation_id=conversation.id, role=MessageRole.USER, content=content))
     conversation.updated_at = func.now()
     await session.flush()
+    await record_leads(session, bot_id=bot.id, conversation_id=conversation.id, message=content)
 
     messages = await session.scalars(
         select(Message)
@@ -77,8 +142,20 @@ async def start_turn(
         .limit(MAX_HISTORY_MESSAGES)
     )
     history = fit_history(list(reversed(list(messages))))
+    grounding = await _ground(
+        session, bot, history, conversation, llm=llm, embedder=embedder, settings=settings
+    )
     await session.commit()
-    return Turn(conversation, history, model, build_system_prompt(bot))
+
+    return Turn(
+        conversation=conversation,
+        history=history,
+        model=model,
+        system_prompt=build_system_prompt(
+            bot, grounding.context, has_knowledge=grounding.has_knowledge
+        ),
+        sources=distinct_sources(grounding.sources),
+    )
 
 
 async def _save_reply(session: AsyncSession, turn: Turn, content: str) -> uuid.UUID | None:
@@ -89,6 +166,7 @@ async def _save_reply(session: AsyncSession, turn: Turn, content: str) -> uuid.U
         role=MessageRole.ASSISTANT,
         content=content,
         model=turn.model,
+        sources=turn.sources or None,
     )
     session.add(message)
     turn.conversation.updated_at = func.now()
@@ -99,11 +177,12 @@ async def _save_reply(session: AsyncSession, turn: Turn, content: str) -> uuid.U
 async def stream_turn(
     session: AsyncSession, llm: LLMProvider, turn: Turn
 ) -> AsyncIterator[ServerSentEvent]:
-    """SSE protocol: conversation, token*, then done | error. Partial replies are kept."""
+    """SSE protocol: conversation, sources, token*, then done | error. Partial replies are kept."""
     yield ServerSentEvent(
         event="conversation",
         data=ConversationEvent(id=turn.conversation.id, title=turn.conversation.title),
     )
+    yield ServerSentEvent(event="sources", data=SourcesEvent(sources=turn.sources))
 
     parts: list[str] = []
     failure: LLMError | None = None

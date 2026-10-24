@@ -33,6 +33,15 @@ class ConversationEvent(BaseModel):
     title: str
 
 
+class Source(BaseModel):
+    document_id: uuid.UUID
+    title: str
+
+
+class SourcesEvent(BaseModel):
+    sources: list[Source]
+
+
 class TokenEvent(BaseModel):
     text: str
 

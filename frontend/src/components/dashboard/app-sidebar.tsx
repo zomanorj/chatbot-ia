@@ -3,7 +3,6 @@
 import {
   Bot,
   ChartColumn,
-  FileText,
   LayoutDashboard,
   Menu,
   Users,
@@ -44,7 +43,6 @@ const NAV: NavItem[] = [
 ]
 
 const UPCOMING: Omit<NavItem, "href">[] = [
-  { label: "Documents", icon: FileText },
   { label: "Prospects", icon: Users },
   { label: "Statistiques", icon: ChartColumn },
 ]
