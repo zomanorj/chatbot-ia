@@ -1,118 +1,109 @@
-# AI Chat — Full-Stack Conversational Interface
+# Mpanampy
 
-**Live demo:** [chatbot-ia-gilt.vercel.app](https://chatbot-ia-gilt.vercel.app)
+[![CI](https://github.com/zomanorj/chatbot-ia/actions/workflows/ci.yml/badge.svg?branch=v2)](https://github.com/zomanorj/chatbot-ia/actions/workflows/ci.yml)
 
-A full-stack conversational AI application with real-time token streaming, persistent multi-conversation management, and Markdown rendering.
+**An AI sales assistant for small businesses, trained on their own catalogue and answering customers in French, Malagasy and English, on their website and on Facebook Messenger.**
 
-## Features
+*Mpanampy* means "helper" in Malagasy.
 
-- **Real-time streaming** via Server-Sent Events (SSE) — token-by-token response delivery
-- **Multi-conversation management** — sidebar with persistent history stored in localStorage
-- **Automatic conversation titles** generated from the first user message
-- **Abort support** — cancel an ongoing generation via AbortController
-- **Message copying** — one-click copy with visual feedback
-- **Timestamps** on each message with full date tooltip
-- **Model selection** — LLaMA 3.3 70B, LLaMA 3.1 8B, Mixtral 8x7B, Gemma 2 9B
-- **Markdown rendering** — formatted code blocks, lists, tables
-- **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for line break
-- **Glassmorphism UI** with dark mode and smooth animations
+> **Status:** under active development (v2). The previous version, a streaming chat interface, is live at [chatbot-ia-gilt.vercel.app](https://chatbot-ia-gilt.vercel.app) and its source is on the `main` branch.
 
-## Tech Stack
+## The problem
+
+In Madagascar and across francophone Africa, most small businesses sell through Facebook. Owners spend hours answering the same questions (prices, stock, delivery areas, opening hours) and lose sales outside business hours.
+
+## The solution
+
+1. The business uploads its catalogue, price list or FAQ (PDF, DOCX, CSV, XLSX).
+2. Mpanampy indexes the content with retrieval-augmented generation (RAG).
+3. The assistant answers customers through an embeddable website widget and Facebook Messenger, and cites its sources.
+4. The owner sees captured leads and unanswered questions in a dashboard, and can improve the assistant in one click.
+
+## Architecture
+
+```
+            ┌──────────────┐      ┌──────────────┐
+            │  Dashboard   │      │    Widget    │◄── customer websites
+            │  (Next.js)   │      │  (Vite, TS)  │
+            └──────┬───────┘      └──────┬───────┘
+                   │      HTTPS / SSE    │          Facebook Messenger
+                   ▼                     ▼                 │ webhooks
+            ┌─────────────────────────────────────┐        │
+            │              FastAPI                │◄───────┘
+            └──────┬──────────────┬───────────────┘
+                   │              │ jobs
+                   ▼              ▼
+       ┌───────────────────┐  ┌────────┐  ┌──────────────────┐
+       │ PostgreSQL        │  │ Redis  │◄─┤ Ingestion worker │
+       │ + pgvector        │  └────────┘  └──────────────────┘
+       └───────────────────┘
+```
+
+## Tech stack
 
 | Layer | Technologies |
-|-------|-------------|
-| Frontend | React 18, Vite, Tailwind CSS, Framer Motion, Lucide React |
-| Backend | Node.js, Express, Helmet, express-rate-limit |
-| AI Provider | LLaMA 3.3 70B via [Groq API](https://console.groq.com) |
-| Transport | Server-Sent Events (SSE) |
+|-------|--------------|
+| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic |
+| Data | PostgreSQL 18, pgvector, Redis 8 |
+| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui |
+| Tooling | uv, Ruff, pytest, Docker Compose, GitHub Actions, pre-commit |
 
-## Project Structure
+## Repository layout
 
 ```
-chatbot-ia/
-├── backend/
-│   ├── src/
-│   │   ├── index.js                   # Express server, CORS, Helmet, rate limiting
-│   │   ├── routes/chat.js             # SSE endpoint, input validation, model selection
-│   │   └── middleware/errorHandler.js
-│   ├── .env.example
-│   └── package.json
-└── frontend/
-    ├── src/
-    │   ├── hooks/
-    │   │   ├── useChat.js             # SSE streaming, AbortController
-    │   │   └── useConversations.js    # Multi-conversation state, localStorage
-    │   ├── components/
-    │   │   ├── Sidebar.jsx
-    │   │   ├── ChatWindow.jsx
-    │   │   ├── MessageBubble.jsx
-    │   │   ├── InputBar.jsx
-    │   │   └── TypingIndicator.jsx
-    │   └── App.jsx
-    ├── .env.example
-    └── package.json
+.
+├── backend/              FastAPI service
+│   ├── app/
+│   │   ├── api/          HTTP routes and dependencies
+│   │   ├── core/         Settings
+│   │   ├── db/           SQLAlchemy base and session
+│   │   └── schemas/      Pydantic models
+│   ├── alembic/          Database migrations
+│   └── tests/
+├── frontend/             Web dashboard (migration to Next.js in progress)
+├── compose.yaml          Local stack: Postgres, Redis, migrations, API
+└── Makefile              Common commands
 ```
 
-## Prerequisites
+## Getting started
 
-- Node.js 18+
-- A Groq API key — available at [console.groq.com](https://console.groq.com)
-
-## Local Setup
-
-### Backend
+**Requirements:** Docker with Compose v2, and [uv](https://docs.astral.sh/uv/getting-started/installation/) to run tooling outside containers.
 
 ```bash
-cd backend
-npm install
+cp backend/.env.example backend/.env
+make up
 ```
 
-Copy `.env.example` to `.env` and fill in your credentials:
+| Endpoint | Description |
+|----------|-------------|
+| `GET  /api/v1/health` | Liveness probe |
+| `GET  /api/v1/health/ready` | Readiness probe, checks PostgreSQL and Redis (503 when degraded) |
+| `GET  /docs` | Interactive OpenAPI documentation (disabled in production) |
 
-```env
-PORT=3001
-GROQ_API_KEY=your_groq_api_key
-FRONTEND_URL=http://localhost:5173
-```
+The API listens on `http://localhost:8000`. If a port is already taken on your machine, copy `.env.example` to `.env` at the repository root and change `POSTGRES_PORT`, `REDIS_PORT` or `API_PORT`.
+
+### Development
 
 ```bash
-npm run dev
+make watch      # live code sync into the API container
+make test       # run the test suite
+make lint       # Ruff lint and format check
+make revision m="describe change"   # new Alembic migration
 ```
 
-The API server will be available at `http://localhost:3001`.
+Install the git hooks once with `uvx pre-commit install`.
 
-### Frontend
+## Roadmap
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The application will be available at `http://localhost:5173`.
-
-## Deployment
-
-### Backend — Render
-
-1. Push the repository to GitHub (ensure `.env` is listed in `.gitignore`)
-2. Create a new **Web Service** on [Render](https://render.com) and connect the repository
-3. Set the following configuration:
-   - Root Directory: `backend`
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-4. Add the required environment variables:
-   - `GROQ_API_KEY` — your Groq API key
-   - `FRONTEND_URL` — your Vercel frontend URL (set after frontend deployment)
-5. Note the service URL provided by Render (e.g., `https://your-app.onrender.com`)
-
-### Frontend — Vercel
-
-1. Create a new project on [Vercel](https://vercel.com) and import the repository
-2. Set Root Directory to `frontend`
-3. Add the environment variable:
-   - `VITE_API_URL` — your Render backend URL
-4. Deploy
+- [x] Foundations: monorepo, containers, health checks, CI
+- [ ] Streaming chat API
+- [ ] Next.js dashboard
+- [ ] Accounts and multi-tenant isolation
+- [ ] Document ingestion and RAG with source citations
+- [ ] Embeddable website widget
+- [ ] Facebook Messenger integration
+- [ ] Analytics: leads and unanswered questions
+- [ ] Production deployment
 
 ## License
 
