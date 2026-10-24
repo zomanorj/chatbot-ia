@@ -45,8 +45,8 @@ In Madagascar and across francophone Africa, most small businesses sell through 
 |-------|--------------|
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic |
 | Data | PostgreSQL 18, pgvector, Redis 8 |
-| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui |
-| Tooling | uv, Ruff, pytest, Docker Compose, GitHub Actions, pre-commit |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query |
+| Tooling | uv, Ruff, pytest, Vitest, ESLint, Prettier, Docker Compose, GitHub Actions, pre-commit |
 
 ## Repository layout
 
@@ -60,18 +60,26 @@ In Madagascar and across francophone Africa, most small businesses sell through 
 │   │   └── schemas/      Pydantic models
 │   ├── alembic/          Database migrations
 │   └── tests/
-├── frontend/             Web dashboard (migration to Next.js in progress)
+├── frontend/             Next.js dashboard and landing page
+│   └── src/
+│       ├── app/          Routes: landing, dashboard, playground
+│       ├── components/   UI, chat and dashboard components
+│       ├── hooks/        Data and chat state hooks
+│       └── lib/          Typed API client, SSE parser
 ├── compose.yaml          Local stack: Postgres, Redis, migrations, API
 └── Makefile              Common commands
 ```
 
 ## Getting started
 
-**Requirements:** Docker with Compose v2, and [uv](https://docs.astral.sh/uv/getting-started/installation/) to run tooling outside containers.
+**Requirements:** Docker with Compose v2, Node.js 24, and [uv](https://docs.astral.sh/uv/getting-started/installation/) to run tooling outside containers.
 
 ```bash
 cp backend/.env.example backend/.env
-make up
+make up                                   # API, PostgreSQL, Redis
+
+cd frontend && cp .env.example .env.local && npm install
+make web                                  # dashboard on http://localhost:3000
 ```
 
 | Endpoint | Description |
@@ -114,6 +122,19 @@ Errors raised before streaming starts use HTTP status codes and a single envelop
 | 429 | `rate_limited` | Per-IP limit reached (`CHAT_RATE_LIMIT`), see `Retry-After` |
 | 503 | `llm_not_configured` | No provider API key on the server |
 
+### Design system
+
+The interface uses [Geist](https://vercel.com/font) for text and code, and a palette defined as OKLCH tokens in `frontend/src/app/globals.css`, with light and dark variants:
+
+| Token | Role |
+|-------|------|
+| `primary` | Emerald, brand and primary actions |
+| `highlight` | Vanilla amber, positive signals such as new leads |
+| `muted`, `accent` | Neutrals tinted toward the brand hue |
+| `success`, `destructive` | System states |
+
+Icons come from [Lucide](https://lucide.dev).
+
 ### Development
 
 ```bash
@@ -121,6 +142,7 @@ make watch      # live code sync into the API container
 make test       # run the test suite
 make lint       # Ruff lint and format check
 make revision m="describe change"   # new Alembic migration
+make web-types  # regenerate typed API client after backend changes
 ```
 
 Install the git hooks once with `uvx pre-commit install`.
@@ -129,7 +151,7 @@ Install the git hooks once with `uvx pre-commit install`.
 
 - [x] Foundations: monorepo, containers, health checks, CI
 - [x] Streaming chat API
-- [ ] Next.js dashboard
+- [x] Next.js dashboard
 - [ ] Accounts and multi-tenant isolation
 - [ ] Document ingestion and RAG with source citations
 - [ ] Embeddable website widget

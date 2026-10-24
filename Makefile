@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 UV := cd backend && uv run
 
-.PHONY: help up watch down logs migrate revision test lint format
+.PHONY: help up watch down logs migrate revision test lint format web web-types
 
 help: ## List available commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -24,11 +24,20 @@ migrate: ## Apply database migrations
 revision: ## Create a migration: make revision m="add users"
 	$(UV) alembic revision --autogenerate -m "$(m)"
 
-test: ## Run backend tests
+test: ## Run backend and frontend tests
 	$(UV) pytest
+	cd frontend && npm test
 
-lint: ## Lint and check formatting
+lint: ## Lint, type-check and check formatting
 	$(UV) ruff check . && $(UV) ruff format --check .
+	cd frontend && npm run lint && npm run typecheck && npm run format:check
 
 format: ## Auto-format and fix lint issues
 	$(UV) ruff format . && $(UV) ruff check --fix .
+	cd frontend && npm run format
+
+web: ## Start the Next.js dev server on port 3000
+	cd frontend && npm run dev
+
+web-types: ## Regenerate frontend API types from the running backend
+	cd frontend && npm run api:types
