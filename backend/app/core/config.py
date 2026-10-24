@@ -18,13 +18,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     groq_api_key: SecretStr | None = None
-    llm_models: list[str] = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-    ]
-    llm_default_model: str = "llama-3.3-70b-versatile"
+    # Production models only: https://console.groq.com/docs/models
+    llm_models: list[str] = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+    llm_default_model: str = "openai/gpt-oss-120b"
 
     # Syntax from https://limits.readthedocs.io, e.g. "20/minute" or "100/hour;20/minute"
     chat_rate_limit: str = "20/minute"

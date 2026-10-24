@@ -42,10 +42,10 @@ async def test_forwards_history_and_selected_model(client: AsyncClient, fake_llm
         {"role": "assistant", "content": "Salama!"},
         user("Inona ny vidiny?"),
     ]
-    await client.post(URL, json={"messages": messages, "model": "llama-3.1-8b-instant"})
+    await client.post(URL, json={"messages": messages, "model": "openai/gpt-oss-20b"})
 
     call = fake_llm.calls[0]
-    assert call["model"] == "llama-3.1-8b-instant"
+    assert call["model"] == "openai/gpt-oss-20b"
     assert [m.content for m in call["messages"]] == ["Salama", "Salama!", "Inona ny vidiny?"]
 
 
