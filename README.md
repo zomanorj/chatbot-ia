@@ -78,9 +78,41 @@ make up
 |----------|-------------|
 | `GET  /api/v1/health` | Liveness probe |
 | `GET  /api/v1/health/ready` | Readiness probe, checks PostgreSQL and Redis (503 when degraded) |
+| `GET  /api/v1/chat/models` | Available language models and the default one |
+| `POST /api/v1/chat/stream` | Streams an assistant reply over Server-Sent Events |
 | `GET  /docs` | Interactive OpenAPI documentation (disabled in production) |
 
 The API listens on `http://localhost:8000`. If a port is already taken on your machine, copy `.env.example` to `.env` at the repository root and change `POSTGRES_PORT`, `REDIS_PORT` or `API_PORT`.
+
+Set `GROQ_API_KEY` in `backend/.env` to enable chat ([get a key](https://console.groq.com/keys)), then:
+
+```bash
+curl -N http://localhost:8000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Salama!"}]}'
+```
+
+### Streaming protocol
+
+`POST /api/v1/chat/stream` accepts up to 50 messages (4,000 characters each, 16,000 in total). The last message must come from the user. The response is a stream of named events:
+
+| Event | Payload | Meaning |
+|-------|---------|---------|
+| `token` | `{"text": "..."}` | Next fragment of the reply |
+| `done` | `{"model": "..."}` | Reply completed |
+| `error` | `{"code": "...", "message": "..."}` | Provider failure, the stream ends |
+
+Errors raised before streaming starts use HTTP status codes and a single envelope:
+
+```json
+{ "error": { "code": "rate_limited", "message": "Too many requests. Please try again later." } }
+```
+
+| Status | Code | Cause |
+|--------|------|-------|
+| 422 | `validation_error`, `unknown_model` | Invalid payload or model not allowed |
+| 429 | `rate_limited` | Per-IP limit reached (`CHAT_RATE_LIMIT`), see `Retry-After` |
+| 503 | `llm_not_configured` | No provider API key on the server |
 
 ### Development
 
@@ -96,7 +128,7 @@ Install the git hooks once with `uvx pre-commit install`.
 ## Roadmap
 
 - [x] Foundations: monorepo, containers, health checks, CI
-- [ ] Streaming chat API
+- [x] Streaming chat API
 - [ ] Next.js dashboard
 - [ ] Accounts and multi-tenant isolation
 - [ ] Document ingestion and RAG with source citations
